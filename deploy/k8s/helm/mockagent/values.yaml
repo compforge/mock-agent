@@ -11,5 +11,6 @@ service:
 
 openai:
   baseUrl: ""
+  model: ""
 
 resources: {}
