@@ -1,0 +1,12 @@
+replicaCount: 1
+
+image:
+  repository: mockagent
+  tag: ""
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources: {}

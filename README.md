@@ -1,38 +1,45 @@
 # Mockagent
 
-Mockagent 是一个可运行的 HTTP mock agent，用来检查调用方能否向下游 agent 发出请求，以及能否正确消费它的 SSE 回复。它把 agent 的输入/事件与对外协议分开：同一个 agent 实现可以由不同协议对外提供服务。
+Mockagent is a small Python web server for emulating a downstream agent. Use it to check that your application sends the expected input and handles streamed responses without running a full agent stack.
 
-当前内置一个 Echo agent 和 Sphere 基础请求/SSE 协议。Echo 会把收到的消息作为 `STREAM_MESSAGE` 发回；服务也会发出 `START` 和 `END`。后续可以在 `framework` 增加 agent 实现，在 `protocol` 增加协议适配器。
+An API handler pairs an agent implementation with a protocol adapter. The agent receives an `AgentInput` and yields `AgentEvent` values; the adapter translates between those values and the HTTP stream. The included Echo agent returns the message it receives.
 
-请求可以选择携带 `agent_request.augmented_context.rewritten_query`。传入时，Echo 的回复包含原消息与改写后的 query，便于确认下游已收到；未传时，Echo 仍直接回复原消息。
+## Quick start
 
-## 快速开始
-
-需要 Python 3.11+ 和 [uv](https://docs.astral.sh/uv/)。
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
 uv run uvicorn server.app:app --reload
 ```
 
-另开终端发送一个请求：
+In another terminal, use the sample client to send a message:
 
 ```bash
-uv run python examples/call_agent.py --message 'hello mockagent'
+uv run python examples/call_agent.py --message "hello mockagent"
 ```
 
-验证可选的改写 query：
+The client prints the streamed events, including Echo's response to the message.
+
+## Extend Mockagent
+
+Implement `Agent.run(input: AgentInput) -> AsyncIterator[AgentEvent]` to add an agent behavior. Pass the implementation to `create_app(agent=...)`; the same agent can be paired with another protocol adapter through `create_app(protocol=...)`.
+
+## Deploy
+
+Build the image from the repository root, then publish it to a registry you can access from your cluster:
 
 ```bash
-uv run python examples/call_agent.py --message '原始问题' --rewritten-query '改写后的问题'
+docker build -f deploy/docker/Dockerfile -t registry.example.com/mockagent:0.1.0 .
+docker push registry.example.com/mockagent:0.1.0
 ```
 
-也可以直接调用 `POST /api/v1/chats`：
+Install the Helm chart with that image:
 
 ```bash
-curl -N http://127.0.0.1:8000/api/v1/chats \
-  -H 'Content-Type: application/json' \
-  -d '{"bot_id":"echo","agent_request":{"message":{"role":"user","parts":[{"type":"text","text":"hello mockagent"}]}}}'
+helm upgrade --install mockagent deploy/k8s/helm/mockagent \
+  --set image.repository=registry.example.com/mockagent \
+  --set image.tag=0.1.0
 ```
 
-服务返回 `text/event-stream`，每个 `data:` 块是一个带 `type` 的 JSON 事件。客户端示例和可复用的流式调用函数位于 `examples/call_agent.py` 与 `src/client/sphere.py`。
+Replace the example registry and tag with your own. The chart creates a Deployment and a ClusterIP Service; its readiness and liveness probes use `/health`.
