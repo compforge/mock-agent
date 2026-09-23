@@ -61,3 +61,5 @@ helm upgrade --install mockagent deploy/k8s/helm/mockagent \
 ```
 
 Replace the example registry and tag with your own. The chart creates a Deployment and a ClusterIP Service; its readiness and liveness probes use `/health`.
+
+Set `openai.baseUrl` in the chart values, or pass `--set-string openai.baseUrl=https://provider.example.com/v1` to Helm, to inject `OPENAI_BASE_URL` into the Pod. The LLM agent also needs `OPENAI_MODEL` and `OPENAI_API_KEY` in its environment.

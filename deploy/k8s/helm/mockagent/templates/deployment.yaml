@@ -25,6 +25,11 @@ spec:
             - name: http
               containerPort: 8000
               protocol: TCP
+          {{- with .Values.openai.baseUrl }}
+          env:
+            - name: OPENAI_BASE_URL
+              value: {{ . | quote }}
+          {{- end }}
           readinessProbe:
             httpGet:
               path: /health
