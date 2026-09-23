@@ -1,40 +1,29 @@
-from collections.abc import Mapping
 from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI
 
-from framework.default.echo import EchoAgent
-from framework.default.llm import LLMAgent
+from framework.default.echo import EchoAgentBuilder
+from framework.default.llm import LLMAgentBuilder
 from protocol.sphere import codec as sphere_codec
-from server.api.chat import ChatBinding, create_chat_router
+from server.api.chat import create_chat_router
 from server.config import ServerConfig
+from server.registry import AgentRegistry
 
 
-def create_app(
-    bindings: Mapping[str, ChatBinding] | None = None,
-) -> FastAPI:
+def create_app(registry: AgentRegistry | None = None) -> FastAPI:
     llm_client = None
-    if bindings is None:
+    if registry is None:
         config = ServerConfig()
         llm_client = httpx.AsyncClient(
             timeout=httpx.Timeout(connect=5, read=60, write=10, pool=5),
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
         )
-        bindings = {
-            "sphere": ChatBinding(
-                protocol=sphere_codec.Protocol(),
-                agents=(
-                    EchoAgent(),
-                    LLMAgent(
-                        llm_client,
-                        model=config.openai_model,
-                        api_key=config.openai_api_key,
-                        base_url=config.openai_base_url,
-                    ),
-                ),
-            )
-        }
+        registry = AgentRegistry()
+        registry.register_protocol("sphere", sphere_codec.Protocol())
+        agent_config = config.to_agent_config()
+        registry.register_agent(EchoAgentBuilder().build(agent_config))
+        registry.register_agent(LLMAgentBuilder(llm_client).build(agent_config))
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -45,7 +34,7 @@ def create_app(
                 await llm_client.aclose()
 
     app = FastAPI(title="Mockagent", lifespan=lifespan)
-    app.include_router(create_chat_router(bindings))
+    app.include_router(create_chat_router(registry))
 
     @app.get("/health")
     async def health() -> dict[str, str]:

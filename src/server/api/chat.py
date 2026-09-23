@@ -1,38 +1,16 @@
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
-from framework.base import Agent
-from protocol.base import AgentProtocol
+from server.registry import AgentRegistry
 
 
-@dataclass(frozen=True)
-class ChatBinding:
-    protocol: AgentProtocol
-    agents: Sequence[Agent]
-
-
-def create_chat_router(
-    bindings: Mapping[str, ChatBinding],
-) -> APIRouter:
+def create_chat_router(registry: AgentRegistry) -> APIRouter:
     router = APIRouter()
-    routes: dict[tuple[str, str], tuple[AgentProtocol, Agent]] = {}
-    for protocol_name, binding in bindings.items():
-        for agent in binding.agents:
-            agent_protocol = agent.protocol()
-            if agent_protocol != protocol_name:
-                raise ValueError(
-                    f"Agent {agent.ID()!r} supports protocol {agent_protocol!r}, "
-                    f"cannot register under {protocol_name!r}"
-                )
-            routes[(protocol_name, agent.ID())] = (binding.protocol, agent)
 
     @router.post("/v1/{protocol}/{agentid}/chat")
     async def chat(request: Request, protocol: str, agentid: str) -> StreamingResponse:
-        route = routes.get((protocol, agentid))
+        route = registry.get(protocol, agentid)
         if route is None:
             raise HTTPException(status_code=404, detail="Unknown agent route")
         selected_protocol, selected_agent = route

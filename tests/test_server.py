@@ -7,13 +7,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agent_model import AgentEvent, AgentInput
-from framework.default.echo import EchoAgent
-from framework.default.llm import LLMAgent
+from framework.base import Agent, AgentConfig
+from framework.default.echo import EchoAgent, EchoAgentBuilder
+from framework.default.llm import LLMAgent, LLMAgentBuilder
 from protocol.sphere.codec import Protocol as SphereProtocol
 from protocol.sphere.model import Failure
 from protocol.sphere.schema import parse_event
-from server.api.chat import ChatBinding
 from server.app import create_app
+from server.registry import AgentRegistry
 
 
 def _request(
@@ -30,6 +31,14 @@ def _request(
     if rewritten_query is not None:
         agent_request["augmented_context"] = {"rewritten_query": rewritten_query}
     return {"bot_id": bot_id, "agent_request": agent_request}
+
+
+def _registry(*agents: Agent) -> AgentRegistry:
+    registry = AgentRegistry()
+    registry.register_protocol("sphere", SphereProtocol())
+    for agent in agents:
+        registry.register_agent(agent)
+    return registry
 
 
 def test_echo_stream() -> None:
@@ -95,20 +104,16 @@ def test_llm_agent_streams_one_upstream_request(
             transport=httpx.MockTransport(upstream)
         ) as llm_client:
             app = create_app(
-                bindings={
-                    "sphere": ChatBinding(
-                        SphereProtocol(),
-                        (
-                            EchoAgent(),
-                            LLMAgent(
-                                llm_client,
-                                model="test-model",
-                                api_key="test-key",
-                                base_url="https://llm.example/v1",
-                            ),
-                        ),
-                    )
-                }
+                _registry(
+                    EchoAgent(),
+                    LLMAgentBuilder(llm_client).build(
+                        AgentConfig(
+                            model="test-model",
+                            api_key="test-key",
+                            base_url="https://llm.example/v1",
+                        )
+                    ),
+                )
             )
             async with httpx.AsyncClient(
                 transport=httpx.ASGITransport(app=app), base_url="http://testserver"
@@ -166,12 +171,7 @@ def test_llm_upstream_http_error_becomes_terminal_event() -> None:
             transport=httpx.MockTransport(upstream)
         ) as llm_client:
             app = create_app(
-                bindings={
-                    "sphere": ChatBinding(
-                        SphereProtocol(),
-                        (LLMAgent(llm_client, model="test-model", api_key="test-key"),),
-                    )
-                }
+                _registry(LLMAgent(llm_client, model="test-model", api_key="test-key"))
             )
             async with httpx.AsyncClient(
                 transport=httpx.ASGITransport(app=app), base_url="http://testserver"
@@ -210,13 +210,7 @@ class FailingAgent:
 
 
 def test_agent_error_is_a_terminal_sse_event() -> None:
-    with TestClient(
-        create_app(
-            bindings={
-                "sphere": ChatBinding(SphereProtocol(), (EchoAgent(), FailingAgent()))
-            }
-        )
-    ) as client:
+    with TestClient(create_app(_registry(EchoAgent(), FailingAgent()))) as client:
         response = client.post("/v1/sphere/failing/chat", json=_request())
         echo_response = client.post("/v1/sphere/echo/chat", json=_request())
 
@@ -250,12 +244,23 @@ def test_unknown_binding(path: str) -> None:
     assert response.status_code == 404
 
 
-def test_agent_protocol_must_match_binding() -> None:
+def test_agent_protocol_must_be_registered() -> None:
     class OtherProtocolAgent(EchoAgent):
         def protocol(self) -> str:
             return "other"
 
-    with pytest.raises(ValueError, match="cannot register under 'sphere'"):
-        create_app(
-            bindings={"sphere": ChatBinding(SphereProtocol(), (OtherProtocolAgent(),))}
-        )
+    with pytest.raises(ValueError, match="Register protocol 'other'"):
+        _registry(OtherProtocolAgent())
+
+
+def test_duplicate_agent_id_is_rejected() -> None:
+    with pytest.raises(ValueError, match="already registered"):
+        _registry(EchoAgent(), EchoAgent())
+
+
+def test_echo_builder_creates_supported_agent() -> None:
+    agent = EchoAgentBuilder().build(
+        AgentConfig(model=None, api_key=None, base_url="https://api.openai.com/v1")
+    )
+    assert agent.ID() == "echo"
+    assert agent.protocol() == "sphere"

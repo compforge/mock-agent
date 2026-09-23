@@ -2,7 +2,13 @@ import json
 from collections.abc import AsyncIterator
 
 from agent_model import AgentEvent, AgentInput
+from framework.base import AgentConfig
 from protocol.sphere import model as sphere
+
+
+class EchoAgentBuilder:
+    def build(self, config: AgentConfig) -> "EchoAgent":
+        return EchoAgent()
 
 
 class EchoAgent:

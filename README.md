@@ -2,7 +2,7 @@
 
 Mockagent is a small Python web server for emulating a downstream agent. Use it to check that your application sends the expected input and handles streamed responses without running a full agent stack.
 
-Each protocol registers the agents it serves. An agent receives an `AgentInput` and yields `AgentEvent` values; its protocol adapter translates between those values and the HTTP stream. The included Echo agent returns the message it receives. The LLM agent sends one streaming Chat Completions request to an OpenAI-compatible endpoint and forwards text chunks as agent events.
+Register protocol adapters and agents at startup. An agent receives an `AgentInput` and yields `AgentEvent` values; its protocol adapter translates between those values and the HTTP stream. The included Echo agent returns the message it receives. The LLM agent sends one streaming Chat Completions request to an OpenAI-compatible endpoint and forwards text chunks as agent events.
 
 ## Quick start
 
@@ -41,18 +41,21 @@ To use another OpenAI-compatible provider, set `OPENAI_BASE_URL` to its API base
 
 ## Extend Mockagent
 
-Implement `Agent.ID()`, `Agent.protocol()` and `Agent.run(input: AgentInput) -> AsyncIterator[AgentEvent]` to add an agent behavior. `protocol()` returns the name of the supported protocol. Each protocol defines its own input and event subclasses. Register a protocol together with its agents under that name:
+Implement `Agent.ID()`, `Agent.protocol()` and `Agent.run(input: AgentInput) -> AsyncIterator[AgentEvent]` to add an agent behavior. Pair it with an `AgentBuilder` whose `build(config: AgentConfig)` creates the agent. `protocol()` returns the name of the supported protocol. Each protocol defines its own input and event subclasses. Register its adapter before building and registering its agents:
 
 ```python
-from server.api.chat import ChatBinding
 from server.app import create_app
+from server.config import ServerConfig
+from server.registry import AgentRegistry
 
-app = create_app(
-    bindings={"your_protocol": ChatBinding(YourProtocol(), (YourAgent(),))}
-)
+registry = AgentRegistry()
+registry.register_protocol("your_protocol", YourProtocol())
+config = ServerConfig().to_agent_config()
+registry.register_agent(YourAgentBuilder().build(config))
+app = create_app(registry)
 ```
 
-Replace `YourProtocol` and `YourAgent` with your implementations.
+Replace `YourProtocol` and `YourAgentBuilder` with your implementations.
 
 ## Deploy
 

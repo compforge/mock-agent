@@ -5,9 +5,23 @@ import httpx
 from httpx_sse import SSEError, aconnect_sse
 
 from agent_model import AgentEvent, AgentInput
+from framework.base import AgentConfig
 from protocol.sphere import model as sphere
 
 logger = logging.getLogger(__name__)
+
+
+class LLMAgentBuilder:
+    def __init__(self, client: httpx.AsyncClient) -> None:
+        self._client = client
+
+    def build(self, config: AgentConfig) -> "LLMAgent":
+        return LLMAgent(
+            self._client,
+            model=config.model,
+            api_key=config.api_key,
+            base_url=config.base_url,
+        )
 
 
 class LLMAgent:
