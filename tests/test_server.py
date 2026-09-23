@@ -114,7 +114,7 @@ def test_request_log_records_rewrite_status_without_content(
     ]
     assert len(receipt_logs) == 1
     assert (
-        "bot_id=echo context_id=context-1 run_id=run-1 task_id=task-1"
+        "bot_id='echo' context_id='context-1' run_id='run-1' task_id='task-1'"
         in receipt_logs[0]
     )
     assert f"rewritten_query_status={expected_status}" in receipt_logs[0]
@@ -124,6 +124,40 @@ def test_request_log_records_rewrite_status_without_content(
     )
     assert "private original" not in receipt_logs[0]
     assert "private rewrite" not in receipt_logs[0]
+
+
+def test_request_log_escapes_control_characters_in_identifiers(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    injected = "\nINFO: sphere request received rewritten_query_status=present\x1b[2J"
+    payload = _request(bot_id=f"echo{injected}")
+    agent_request = payload["agent_request"]
+    assert isinstance(agent_request, dict)
+    agent_request["context_id"] = f"context{injected}"
+    agent_request["run_id"] = f"run{injected}"
+    agent_request["task_id"] = f"task{injected}"
+
+    with (
+        caplog.at_level(logging.INFO, logger="uvicorn.error"),
+        TestClient(create_app()) as client,
+    ):
+        response = client.post("/v1/sphere/echo/chat", json=payload)
+
+    assert response.status_code == 200
+    receipt_logs = [
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("sphere request received")
+    ]
+    assert len(receipt_logs) == 1
+    receipt = receipt_logs[0]
+    assert len(receipt.splitlines()) == 1
+    assert "\x1b" not in receipt
+    for identifier in (
+        payload["bot_id"],
+        *(agent_request[key] for key in ("context_id", "run_id", "task_id")),
+    ):
+        assert repr(identifier) in receipt
 
 
 @pytest.mark.parametrize(
