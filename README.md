@@ -21,6 +21,25 @@ uv run python examples/call_agent.py --message "hello mockagent"
 
 The client prints the streamed events, including Echo's response to the message.
 
+## Sphere protocol reference
+
+See the [Sphere protocol reference](docs/sphere-protocol.md) for the request fields, SSE events, and runnable agent example. Executor posts a **bare `AgentRequest`** to the configured agent URL; the agent ID is already in `/v1/sphere/{agentid}/chat`. Mockagent also accepts the older `{ "bot_id": "echo", "agent_request": { ... } }` wrapper used by earlier sample clients.
+
+```bash
+curl -N http://127.0.0.1:8000/v1/sphere/echo/chat \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "run_id": "run-1",
+    "context_id": "conversation-1",
+    "task_id": "task-1",
+    "message": {"role": "user", "parts": [{"type": "text", "text": "original question"}]},
+    "augmented_context": {"rewritten_query": "rewritten question"},
+    "configuration": {"execution_mode": "sub_agent"}
+  }'
+```
+
+The response is `text/event-stream`. Echo emits `STREAM_MESSAGE` with the original text and, when present, the exact `rewritten_query`; `/v1/sphere/demo/chat` also emits a final `OUTPUT`. `rewritten_query` is optional, and receipt logs distinguish a missing field, JSON `null`, an empty string, and a present value.
+
 ## Check received requests
 
 Each valid Sphere request produces a `sphere request received` log line with its bot, context, run, and task IDs. `rewritten_query_status` is `missing`, `null`, `empty`, or `present`, so you can check whether a caller sent the field without logging the user's message or rewritten text. Match the IDs with the calling application; use Echo's streamed response when you need to compare the exact rewritten query.

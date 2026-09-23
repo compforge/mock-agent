@@ -12,8 +12,18 @@ from framework.base import Agent, AgentConfig
 from framework.default.echo import EchoAgent, EchoAgentBuilder
 from framework.default.llm import LLMAgent, LLMAgentBuilder
 from protocol.sphere.codec import Protocol as SphereProtocol
-from protocol.sphere.model import Failure
-from protocol.sphere.schema import parse_event
+from protocol.sphere.model import Failure, Input, WireEventOutput
+from protocol.sphere.schema import (
+    DataPart,
+    FollowUpExpectedEvent,
+    OutputEvent,
+    Reference,
+    ReferenceEvent,
+    StepToolEvent,
+    TaskEvent,
+    TextPart,
+    parse_event,
+)
 from server.app import create_app
 from server.registry import AgentRegistry
 
@@ -57,6 +67,145 @@ def test_echo_stream() -> None:
     assert events[1].content == "hello"
     assert all(event.run_id == "run-1" for event in events)
     assert all(event.task_id == "task-1" for event in events)
+
+
+def test_executor_bare_request_preserves_sphere_context() -> None:
+    class InspectAgent:
+        def ID(self) -> str:
+            return "inspect"
+
+        def protocol(self) -> str:
+            return "sphere"
+
+        async def run(self, input: AgentInput) -> AsyncIterator[AgentEvent]:
+            assert isinstance(input, Input)
+            assert input.bot_id is None
+            assert input.request.context_id == "context-1"
+            assert input.request.augmented_context is not None
+            assert input.request.augmented_context.rewritten_query == "rewritten"
+            assert input.request.history is not None
+            assert input.request.history[0].meta_data == {"generated_by_me": True}
+            assert input.request.message.parts[1].type == "file"
+            assert input.request.message.parts[2].type == "data"
+            assert input.request.configuration is not None
+            assert input.request.configuration.execution_mode == "sub_agent"
+            assert input.request.meta_data == {"customer_option": "value"}
+            yield WireEventOutput(
+                TaskEvent(task_id=input.task_id or "", task_status="WORKING")
+            )
+            yield WireEventOutput(
+                StepToolEvent(tool_name="mock_tool", tool_status="start")
+            )
+            yield WireEventOutput(
+                ReferenceEvent(
+                    references=[
+                        Reference(
+                            ref_num=1,
+                            content="source",
+                            resource_from="web",
+                            title="Example",
+                            url="https://example.com",
+                        )
+                    ]
+                )
+            )
+            yield WireEventOutput(
+                OutputEvent(parts=[TextPart(text="done"), DataPart(data={"ok": True})])
+            )
+            yield WireEventOutput(FollowUpExpectedEvent())
+
+    payload = {
+        "run_id": "run-1",
+        "task_id": "task-1",
+        "context_id": "context-1",
+        "augmented_context": {
+            "rewritten_query": "rewritten",
+            "contains_pii": True,
+            "topic_control": {"labels": ["support"]},
+        },
+        "history": [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "text": "earlier"}],
+                "meta_data": {"generated_by_me": True},
+            }
+        ],
+        "message": {
+            "role": "user",
+            "parts": [
+                {"type": "text", "text": "original"},
+                {
+                    "type": "file",
+                    "file": {"kind": "bytes", "name": "a.txt", "bytes": "YQ=="},
+                },
+                {"type": "data", "data": {"source": "test"}},
+            ],
+        },
+        "configuration": {"execution_mode": "sub_agent", "deep_mode": True},
+        "meta_data": {"customer_option": "value"},
+    }
+    with TestClient(create_app(_registry(InspectAgent()))) as client:
+        response = client.post("/v1/sphere/inspect/chat", json=payload)
+
+    assert response.status_code == 200
+    events = [
+        parse_event(line.removeprefix("data: "))
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    assert [event.type for event in events] == [
+        "START",
+        "TASK",
+        "STEP_TOOL",
+        "REFERENCE",
+        "OUTPUT",
+        "FOLLOW_UP_EXPECTED",
+        "END",
+    ]
+    assert all(event.run_id == "run-1" for event in events)
+    assert all(event.task_id == "task-1" for event in events)
+    assert events[4].parts[1].data == {"ok": True}
+
+
+@pytest.mark.parametrize("rewritten_query", [None, "", "rewritten"])
+def test_bare_request_echo_and_rewrite_log(
+    caplog: pytest.LogCaptureFixture, rewritten_query: str | None
+) -> None:
+    payload = _request(message="original")["agent_request"]
+    assert isinstance(payload, dict)
+    if rewritten_query is not None:
+        payload["augmented_context"] = {"rewritten_query": rewritten_query}
+    with (
+        caplog.at_level(logging.INFO, logger="uvicorn.error"),
+        TestClient(create_app()) as client,
+    ):
+        response = client.post("/v1/sphere/echo/chat", json=payload)
+
+    assert response.status_code == 200
+    events = [
+        parse_event(line.removeprefix("data: "))
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    expected = (
+        "original"
+        if rewritten_query is None
+        else json.dumps(
+            {"message": "original", "rewritten_query": rewritten_query},
+            ensure_ascii=False,
+        )
+    )
+    assert events[1].content == expected
+    receipt = next(
+        record.getMessage()
+        for record in caplog.records
+        if "sphere request received" in record.getMessage()
+    )
+    assert "bot_id=None" in receipt
+    assert (
+        f"rewritten_query_status={'missing' if rewritten_query is None else 'empty' if rewritten_query == '' else 'present'}"
+        in receipt
+    )
 
 
 @pytest.mark.parametrize("rewritten_query", ["改写后的问题", ""])
