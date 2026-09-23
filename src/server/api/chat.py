@@ -19,11 +19,16 @@ def create_chat_router(
     bindings: Mapping[str, ChatBinding],
 ) -> APIRouter:
     router = APIRouter()
-    routes = {
-        (protocol_name, agent.ID()): (binding.protocol, agent)
-        for protocol_name, binding in bindings.items()
-        for agent in binding.agents
-    }
+    routes: dict[tuple[str, str], tuple[AgentProtocol, Agent]] = {}
+    for protocol_name, binding in bindings.items():
+        for agent in binding.agents:
+            agent_protocol = agent.protocol()
+            if agent_protocol != protocol_name:
+                raise ValueError(
+                    f"Agent {agent.ID()!r} supports protocol {agent_protocol!r}, "
+                    f"cannot register under {protocol_name!r}"
+                )
+            routes[(protocol_name, agent.ID())] = (binding.protocol, agent)
 
     @router.post("/v1/{protocol}/{agentid}/chat")
     async def chat(request: Request, protocol: str, agentid: str) -> StreamingResponse:

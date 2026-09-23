@@ -27,6 +27,9 @@ class LLMAgent:
     def ID(self) -> str:
         return "llm"
 
+    def protocol(self) -> str:
+        return "sphere"
+
     async def run(self, input: AgentInput) -> AsyncIterator[AgentEvent]:
         if not isinstance(input, sphere.Input):
             raise TypeError("LLMAgent requires protocol.sphere.model.Input")

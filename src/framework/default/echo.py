@@ -9,6 +9,9 @@ class EchoAgent:
     def ID(self) -> str:
         return "echo"
 
+    def protocol(self) -> str:
+        return "sphere"
+
     async def run(self, input: AgentInput) -> AsyncIterator[AgentEvent]:
         if not isinstance(input, sphere.Input):
             raise TypeError("EchoAgent requires protocol.sphere.model.Input")

@@ -28,7 +28,7 @@ tests/                    # API 与客户端行为验证
 
 - `AgentInput` 与 `AgentEvent` 是全局基类，只放不同协议都能复用的字段和事件语义。每个 `protocol/<name>/` 定义自己的输入和事件子类；协议字段、请求校验和 SSE 编码由该目录负责，不让 handler 或 agent 实现解析协议载荷。
 - 一个协议放在 `protocol/` 的一个目录。`framework/default/` 收纳不依赖外部 agent framework 的实现；接入其他 framework 时在 `framework/` 下单独建目录，公共接口保留在 `framework/base.py`。
-- `Agent.ID()` 返回实现的公开 ID；`Agent.run(input)` 的调用结果是 `AsyncIterator[AgentEvent]`。具体实现使用带 `yield` 的 `async def`，接口声明返回异步迭代器，不声明为需要先 `await` 的协程。
+- `Agent.ID()` 返回实现的公开 ID，`Agent.protocol()` 返回支持的协议名；注册时协议名必须与绑定名一致。`Agent.run(input)` 的调用结果是 `AsyncIterator[AgentEvent]`。具体实现使用带 `yield` 的 `async def`，接口声明返回异步迭代器，不声明为需要先 `await` 的协程。
 - `/v1/{protocol}/{agentid}/chat` 使用启动时注册的协议与 agent 绑定。`server/api` 只做路由选择与 HTTP 边界处理；`framework/default/` 是源码组织，不参与 URL 路由。客户端通过 `protocol` 中的模型和事件解析函数复用协议契约。
 
 ## 验证与参考

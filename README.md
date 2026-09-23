@@ -41,7 +41,7 @@ To use another OpenAI-compatible provider, set `OPENAI_BASE_URL` to its API base
 
 ## Extend Mockagent
 
-Implement `Agent.run(input: AgentInput) -> AsyncIterator[AgentEvent]` to add an agent behavior. Each protocol defines its own input and event subclasses. Register a protocol together with the agents it serves:
+Implement `Agent.ID()`, `Agent.protocol()` and `Agent.run(input: AgentInput) -> AsyncIterator[AgentEvent]` to add an agent behavior. `protocol()` returns the name of the supported protocol. Each protocol defines its own input and event subclasses. Register a protocol together with its agents under that name:
 
 ```python
 from server.api.chat import ChatBinding

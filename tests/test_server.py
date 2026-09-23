@@ -202,6 +202,9 @@ class FailingAgent:
     def ID(self) -> str:
         return "failing"
 
+    def protocol(self) -> str:
+        return "sphere"
+
     async def run(self, input: AgentInput) -> AsyncIterator[AgentEvent]:
         yield Failure(code="EXPECTED_FAILURE", message="Expected failure")
 
@@ -245,3 +248,14 @@ def test_unknown_binding(path: str) -> None:
         response = client.post(path, json=_request())
 
     assert response.status_code == 404
+
+
+def test_agent_protocol_must_match_binding() -> None:
+    class OtherProtocolAgent(EchoAgent):
+        def protocol(self) -> str:
+            return "other"
+
+    with pytest.raises(ValueError, match="cannot register under 'sphere'"):
+        create_app(
+            bindings={"sphere": ChatBinding(SphereProtocol(), (OtherProtocolAgent(),))}
+        )
