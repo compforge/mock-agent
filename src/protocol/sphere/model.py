@@ -1,11 +1,15 @@
 from dataclasses import dataclass
 
 from agent_model import AgentEvent, AgentInput
+from protocol.sphere.schema import AgentRequest, WireEvent
 
 
 @dataclass(frozen=True, kw_only=True)
 class Input(AgentInput):
-    bot_id: str
+    # Preserve the full request for agents that use history, files, configuration,
+    # or augmented context beyond the text Echo uses.
+    request: AgentRequest
+    bot_id: str | None = None
     rewritten_query: str | None = None
 
 
@@ -23,3 +27,10 @@ class TextDelta(Event):
 class Failure(Event):
     code: str
     message: str
+
+
+@dataclass(frozen=True)
+class WireEventOutput(Event):
+    """Emit a documented Sphere event from a custom mock agent."""
+
+    event: WireEvent

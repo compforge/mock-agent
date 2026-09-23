@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from framework.default.echo import EchoAgentBuilder
 from framework.default.llm import LLMAgentBuilder
+from framework.default.sphere_demo import SphereDemoAgentBuilder
 from protocol.sphere import codec as sphere_codec
 from server.api.chat import create_chat_router
 from server.config import ServerConfig
@@ -24,6 +25,7 @@ def create_app(registry: AgentRegistry | None = None) -> FastAPI:
         agent_config = config.to_agent_config()
         registry.register_agent(EchoAgentBuilder().build(agent_config))
         registry.register_agent(LLMAgentBuilder(llm_client).build(agent_config))
+        registry.register_agent(SphereDemoAgentBuilder().build(agent_config))
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):

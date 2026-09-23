@@ -3,13 +3,18 @@ from collections.abc import AsyncIterator, Mapping
 import httpx
 from httpx_sse import aconnect_sse
 
-from protocol.sphere.schema import AgentChatRequest, WireEvent, parse_event
+from protocol.sphere.schema import (
+    AgentChatRequest,
+    AgentRequest,
+    WireEvent,
+    parse_event,
+)
 
 
 async def stream_chat(
     client: httpx.AsyncClient,
     url: str,
-    request: AgentChatRequest,
+    request: AgentRequest | AgentChatRequest,
     headers: Mapping[str, str] | None = None,
 ) -> AsyncIterator[WireEvent]:
     """Stream Sphere events from an HTTP agent endpoint."""
