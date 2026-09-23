@@ -11,7 +11,8 @@ from protocol.sphere.schema import (
     StreamMessageEvent,
 )
 
-logger = logging.getLogger(__name__)
+# Uvicorn's configured logger makes receipt records visible in container logs.
+logger = logging.getLogger("uvicorn.error")
 
 
 def _sse(event: StartEvent | StreamMessageEvent | ErrorEvent | EndEvent) -> str:
@@ -21,12 +22,33 @@ def _sse(event: StartEvent | StreamMessageEvent | ErrorEvent | EndEvent) -> str:
 class Protocol:
     def decode_request(self, payload: object) -> Input:
         request = AgentChatRequest.model_validate(payload)
+        augmented_context = request.agent_request.augmented_context
+        rewrite_status = "missing"
+        if (
+            augmented_context is not None
+            and "rewritten_query" in augmented_context.model_fields_set
+        ):
+            if augmented_context.rewritten_query is None:
+                rewrite_status = "null"
+            elif augmented_context.rewritten_query == "":
+                rewrite_status = "empty"
+            else:
+                rewrite_status = "present"
+        logger.info(
+            "sphere request received bot_id=%s context_id=%s run_id=%s task_id=%s "
+            "rewritten_query_status=%s contains_pii=%s",
+            request.bot_id,
+            request.agent_request.context_id,
+            request.agent_request.run_id,
+            request.agent_request.task_id,
+            rewrite_status,
+            augmented_context.contains_pii if augmented_context else False,
+        )
         message = "\n".join(
             part.text
             for part in request.agent_request.message.parts
             if part.type == "text" and part.text is not None
         )
-        augmented_context = request.agent_request.augmented_context
         return Input(
             message=message,
             run_id=request.agent_request.run_id,
