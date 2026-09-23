@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mockagent"
+version = "0.1.0"
+description = "A small HTTP mock agent with pluggable agent implementations and wire protocols"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "httpx>=0.27,<1",
+    "httpx-sse>=0.4,<1",
+    "pydantic>=2,<3",
+    "uvicorn>=0.30,<1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<9",
+    "ruff>=0.13,<1",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["agent_model"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["server*", "protocol*", "framework*", "client*"]
+
+[tool.ruff]
+target-version = "py311"
+
