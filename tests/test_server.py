@@ -9,8 +9,10 @@ from fastapi.testclient import TestClient
 from agent_model import AgentEvent, AgentInput
 from framework.default.echo import EchoAgent
 from framework.default.llm import LLMAgent
+from protocol.sphere.codec import Protocol as SphereProtocol
 from protocol.sphere.model import Failure
 from protocol.sphere.schema import parse_event
+from server.api.chat import ChatBinding
 from server.app import create_app
 
 
@@ -32,7 +34,7 @@ def _request(
 
 def test_echo_stream() -> None:
     with TestClient(create_app()) as client:
-        response = client.post("/v1/sphere/default/echo/chat", json=_request())
+        response = client.post("/v1/sphere/echo/chat", json=_request())
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
@@ -51,7 +53,7 @@ def test_echo_stream() -> None:
 def test_rewritten_query_reaches_agent(rewritten_query: str) -> None:
     with TestClient(create_app()) as client:
         response = client.post(
-            "/v1/sphere/default/echo/chat", json=_request("原始问题", rewritten_query)
+            "/v1/sphere/echo/chat", json=_request("原始问题", rewritten_query)
         )
 
     events = [
@@ -93,14 +95,17 @@ def test_llm_agent_streams_one_upstream_request(
             transport=httpx.MockTransport(upstream)
         ) as llm_client:
             app = create_app(
-                frameworks={
-                    "default": (
-                        EchoAgent(),
-                        LLMAgent(
-                            llm_client,
-                            model="test-model",
-                            api_key="test-key",
-                            base_url="https://llm.example/v1",
+                bindings={
+                    "sphere": ChatBinding(
+                        SphereProtocol(),
+                        (
+                            EchoAgent(),
+                            LLMAgent(
+                                llm_client,
+                                model="test-model",
+                                api_key="test-key",
+                                base_url="https://llm.example/v1",
+                            ),
                         ),
                     )
                 }
@@ -109,7 +114,7 @@ def test_llm_agent_streams_one_upstream_request(
                 transport=httpx.ASGITransport(app=app), base_url="http://testserver"
             ) as client:
                 response = await client.post(
-                    "/v1/sphere/default/llm/chat",
+                    "/v1/sphere/llm/chat",
                     json=_request("original", rewritten_query, bot_id="llm"),
                 )
 
@@ -141,9 +146,7 @@ def test_llm_agent_without_configuration_returns_error(monkeypatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_MODEL", raising=False)
     with TestClient(create_app()) as client:
-        response = client.post(
-            "/v1/sphere/default/llm/chat", json=_request(bot_id="llm")
-        )
+        response = client.post("/v1/sphere/llm/chat", json=_request(bot_id="llm"))
 
     events = [
         parse_event(line.removeprefix("data: "))
@@ -163,9 +166,10 @@ def test_llm_upstream_http_error_becomes_terminal_event() -> None:
             transport=httpx.MockTransport(upstream)
         ) as llm_client:
             app = create_app(
-                frameworks={
-                    "default": (
-                        LLMAgent(llm_client, model="test-model", api_key="test-key"),
+                bindings={
+                    "sphere": ChatBinding(
+                        SphereProtocol(),
+                        (LLMAgent(llm_client, model="test-model", api_key="test-key"),),
                     )
                 }
             )
@@ -173,7 +177,7 @@ def test_llm_upstream_http_error_becomes_terminal_event() -> None:
                 transport=httpx.ASGITransport(app=app), base_url="http://testserver"
             ) as client:
                 response = await client.post(
-                    "/v1/sphere/default/llm/chat", json=_request(bot_id="llm")
+                    "/v1/sphere/llm/chat", json=_request(bot_id="llm")
                 )
 
         events = [
@@ -189,7 +193,7 @@ def test_llm_upstream_http_error_becomes_terminal_event() -> None:
 
 def test_invalid_request() -> None:
     with TestClient(create_app()) as client:
-        response = client.post("/v1/sphere/default/echo/chat", json={"bot_id": "echo"})
+        response = client.post("/v1/sphere/echo/chat", json={"bot_id": "echo"})
 
     assert response.status_code == 422
 
@@ -204,10 +208,14 @@ class FailingAgent:
 
 def test_agent_error_is_a_terminal_sse_event() -> None:
     with TestClient(
-        create_app(frameworks={"default": (EchoAgent(), FailingAgent())})
+        create_app(
+            bindings={
+                "sphere": ChatBinding(SphereProtocol(), (EchoAgent(), FailingAgent()))
+            }
+        )
     ) as client:
-        response = client.post("/v1/sphere/default/failing/chat", json=_request())
-        echo_response = client.post("/v1/sphere/default/echo/chat", json=_request())
+        response = client.post("/v1/sphere/failing/chat", json=_request())
+        echo_response = client.post("/v1/sphere/echo/chat", json=_request())
 
     events = [
         parse_event(line.removeprefix("data: "))
@@ -227,9 +235,9 @@ def test_agent_error_is_a_terminal_sse_event() -> None:
 @pytest.mark.parametrize(
     "path",
     [
-        "/v1/unknown/default/echo/chat",
-        "/v1/sphere/unknown/echo/chat",
-        "/v1/sphere/default/unknown/chat",
+        "/v1/unknown/echo/chat",
+        "/v1/sphere/unknown/chat",
+        "/v1/sphere/default/echo/chat",
     ],
 )
 def test_unknown_binding(path: str) -> None:

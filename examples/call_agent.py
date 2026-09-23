@@ -41,5 +41,5 @@ if __name__ == "__main__":
     parser.add_argument("--message", default="hello mockagent")
     parser.add_argument("--rewritten-query")
     args = parser.parse_args()
-    url = args.url or f"http://127.0.0.1:8000/v1/sphere/default/{args.agent_id}/chat"
+    url = args.url or f"http://127.0.0.1:8000/v1/sphere/{args.agent_id}/chat"
     asyncio.run(main(url, args.agent_id, args.message, args.rewritten_query))

@@ -1,4 +1,5 @@
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -8,24 +9,28 @@ from framework.base import Agent
 from protocol.base import AgentProtocol
 
 
+@dataclass(frozen=True)
+class ChatBinding:
+    protocol: AgentProtocol
+    agents: Sequence[Agent]
+
+
 def create_chat_router(
-    protocols: Mapping[str, AgentProtocol],
-    frameworks: Mapping[str, Sequence[Agent]],
+    bindings: Mapping[str, ChatBinding],
 ) -> APIRouter:
     router = APIRouter()
-    agents_by_framework = {
-        framework: {agent.ID(): agent for agent in agents}
-        for framework, agents in frameworks.items()
+    routes = {
+        (protocol_name, agent.ID()): (binding.protocol, agent)
+        for protocol_name, binding in bindings.items()
+        for agent in binding.agents
     }
 
-    @router.post("/v1/{protocol}/{framework}/{agentid}/chat")
-    async def chat(
-        request: Request, protocol: str, framework: str, agentid: str
-    ) -> StreamingResponse:
-        selected_protocol = protocols.get(protocol)
-        selected_agent = agents_by_framework.get(framework, {}).get(agentid)
-        if selected_protocol is None or selected_agent is None:
+    @router.post("/v1/{protocol}/{agentid}/chat")
+    async def chat(request: Request, protocol: str, agentid: str) -> StreamingResponse:
+        route = routes.get((protocol, agentid))
+        if route is None:
             raise HTTPException(status_code=404, detail="Unknown agent route")
+        selected_protocol, selected_agent = route
 
         try:
             input = selected_protocol.decode_request(await request.json())

@@ -2,7 +2,7 @@
 
 Mockagent is a small Python web server for emulating a downstream agent. Use it to check that your application sends the expected input and handles streamed responses without running a full agent stack.
 
-An API handler pairs an agent implementation with a protocol adapter. The agent receives an `AgentInput` and yields `AgentEvent` values; the adapter translates between those values and the HTTP stream. The included Echo agent returns the message it receives. The LLM agent sends one streaming Chat Completions request to an OpenAI-compatible endpoint and forwards text chunks as agent events.
+Each protocol registers the agents it serves. An agent receives an `AgentInput` and yields `AgentEvent` values; its protocol adapter translates between those values and the HTTP stream. The included Echo agent returns the message it receives. The LLM agent sends one streaming Chat Completions request to an OpenAI-compatible endpoint and forwards text chunks as agent events.
 
 ## Quick start
 
@@ -31,7 +31,7 @@ export OPENAI_MODEL="your-model"
 uv run uvicorn server.app:app --reload
 ```
 
-In another terminal, call `/v1/sphere/default/llm/chat`:
+In another terminal, call `/v1/sphere/llm/chat`:
 
 ```bash
 uv run python examples/call_agent.py --agent-id llm --message "hello mockagent"
@@ -41,7 +41,18 @@ To use another OpenAI-compatible provider, set `OPENAI_BASE_URL` to its API base
 
 ## Extend Mockagent
 
-Implement `Agent.run(input: AgentInput) -> AsyncIterator[AgentEvent]` to add an agent behavior. Each protocol defines its own input and event subclasses. Register agents with `create_app(frameworks={"default": (YourAgent(),)})` and protocols with `create_app(protocols={"your_protocol": YourProtocol()})`.
+Implement `Agent.run(input: AgentInput) -> AsyncIterator[AgentEvent]` to add an agent behavior. Each protocol defines its own input and event subclasses. Register a protocol together with the agents it serves:
+
+```python
+from server.api.chat import ChatBinding
+from server.app import create_app
+
+app = create_app(
+    bindings={"your_protocol": ChatBinding(YourProtocol(), (YourAgent(),))}
+)
+```
+
+Replace `YourProtocol` and `YourAgent` with your implementations.
 
 ## Deploy
 
