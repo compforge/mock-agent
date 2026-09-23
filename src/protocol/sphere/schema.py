@@ -54,9 +54,9 @@ class EndEvent(_Event):
     suggest_question: bool = False
 
 
-SphereEvent = StartEvent | StreamMessageEvent | ErrorEvent | EndEvent
-_event_adapter = TypeAdapter(Annotated[SphereEvent, Field(discriminator="type")])
+WireEvent = StartEvent | StreamMessageEvent | ErrorEvent | EndEvent
+_event_adapter = TypeAdapter(Annotated[WireEvent, Field(discriminator="type")])
 
 
-def parse_event(data: str) -> SphereEvent:
+def parse_event(data: str) -> WireEvent:
     return _event_adapter.validate_json(data)

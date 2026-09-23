@@ -2,7 +2,7 @@
 
 Mockagent is a small Python web server for emulating a downstream agent. Use it to check that your application sends the expected input and handles streamed responses without running a full agent stack.
 
-An API handler pairs an agent implementation with a protocol adapter. The agent receives an `AgentInput` and yields `AgentEvent` values; the adapter translates between those values and the HTTP stream. The included Echo agent returns the message it receives.
+Register protocol adapters and agents at startup. An agent receives an `AgentInput` and yields `AgentEvent` values; its protocol adapter translates between those values and the HTTP stream. The included Echo agent returns the message it receives. The LLM agent sends one streaming Chat Completions request to an OpenAI-compatible endpoint and forwards text chunks as agent events.
 
 ## Quick start
 
@@ -21,9 +21,41 @@ uv run python examples/call_agent.py --message "hello mockagent"
 
 The client prints the streamed events, including Echo's response to the message.
 
+## LLM agent
+
+Set a model and API key before starting the server:
+
+```bash
+export OPENAI_API_KEY="your-api-key"
+export OPENAI_MODEL="your-model"
+uv run uvicorn server.app:app --reload
+```
+
+In another terminal, call `/v1/sphere/llm/chat`:
+
+```bash
+uv run python examples/call_agent.py --agent-id llm --message "hello mockagent"
+```
+
+To use another OpenAI-compatible provider, set `OPENAI_BASE_URL` to its API base URL before starting the server. The LLM agent streams text chunks back to the caller. A missing model or API key produces an SSE `ERROR` event.
+
 ## Extend Mockagent
 
-Implement `Agent.run(input: AgentInput) -> AsyncIterator[AgentEvent]` to add an agent behavior. Pass the implementation to `create_app(agent=...)`; the same agent can be paired with another protocol adapter through `create_app(protocol=...)`.
+Implement `Agent.ID()`, `Agent.protocol()` and `Agent.run(input: AgentInput) -> AsyncIterator[AgentEvent]` to add an agent behavior. Pair it with an `AgentBuilder` whose `build(config: AgentConfig)` creates the agent. `protocol()` returns the name of the supported protocol. Each protocol defines its own input and event subclasses. Register its adapter before building and registering its agents:
+
+```python
+from server.app import create_app
+from server.config import ServerConfig
+from server.registry import AgentRegistry
+
+registry = AgentRegistry()
+registry.register_protocol("your_protocol", YourProtocol())
+config = ServerConfig().to_agent_config()
+registry.register_agent(YourAgentBuilder().build(config))
+app = create_app(registry)
+```
+
+Replace `YourProtocol` and `YourAgentBuilder` with your implementations.
 
 ## Deploy
 
@@ -43,3 +75,5 @@ helm upgrade --install mockagent deploy/k8s/helm/mockagent \
 ```
 
 Replace the example registry and tag with your own. The chart creates a Deployment and a ClusterIP Service; its readiness and liveness probes use `/health`.
+
+Set `openai.baseUrl` in the chart values, or pass `--set-string openai.baseUrl=https://provider.example.com/v1` to Helm, to inject `OPENAI_BASE_URL` into the Pod. The LLM agent also needs `OPENAI_MODEL` and `OPENAI_API_KEY` in its environment.
