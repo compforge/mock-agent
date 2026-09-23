@@ -7,6 +7,7 @@ class AgentInput:
     bot_id: str
     run_id: str | None = None
     task_id: str | None = None
+    rewritten_query: str | None = None
 
 
 @dataclass(frozen=True)

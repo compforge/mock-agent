@@ -13,10 +13,15 @@ class AgentMessage(BaseModel):
     parts: list[MessagePart] = Field(min_length=1)
 
 
+class AgentAugmentedContext(BaseModel):
+    rewritten_query: str | None = None
+
+
 class AgentRequest(BaseModel):
     message: AgentMessage
     run_id: str | None = None
     task_id: str | None = None
+    augmented_context: AgentAugmentedContext | None = None
 
 
 class AgentChatRequest(BaseModel):

@@ -25,11 +25,15 @@ class SphereProtocol:
             for part in request.agent_request.message.parts
             if part.type == "text" and part.text is not None
         )
+        augmented_context = request.agent_request.augmented_context
         return AgentInput(
             message=message,
             bot_id=request.bot_id,
             run_id=request.agent_request.run_id,
             task_id=request.agent_request.task_id,
+            rewritten_query=(
+                augmented_context.rewritten_query if augmented_context else None
+            ),
         )
 
     async def encode_stream(

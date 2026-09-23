@@ -1,9 +1,11 @@
 import asyncio
+import json
 
 import httpx
 
 from client.sphere import stream_chat
 from protocol.sphere.schema import (
+    AgentAugmentedContext,
     AgentChatRequest,
     AgentMessage,
     AgentRequest,
@@ -19,7 +21,8 @@ def test_client_reads_the_server_stream() -> None:
             agent_request=AgentRequest(
                 message=AgentMessage(
                     role="user", parts=[MessagePart(type="text", text="from client")]
-                )
+                ),
+                augmented_context=AgentAugmentedContext(rewritten_query="rewritten"),
             ),
         )
         transport = httpx.ASGITransport(app=create_app())
@@ -31,6 +34,9 @@ def test_client_reads_the_server_stream() -> None:
             ]
 
         assert [event.type for event in events] == ["START", "STREAM_MESSAGE", "END"]
-        assert events[1].content == "from client"
+        assert json.loads(events[1].content) == {
+            "message": "from client",
+            "rewritten_query": "rewritten",
+        }
 
     asyncio.run(check())
