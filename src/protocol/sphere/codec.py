@@ -34,8 +34,9 @@ class Protocol:
                 rewrite_status = "empty"
             else:
                 rewrite_status = "present"
+        # Request IDs are caller-controlled; %r escapes log-breaking control characters.
         logger.info(
-            "sphere request received bot_id=%s context_id=%s run_id=%s task_id=%s "
+            "sphere request received bot_id=%r context_id=%r run_id=%r task_id=%r "
             "rewritten_query_status=%s contains_pii=%s",
             request.bot_id,
             request.agent_request.context_id,
