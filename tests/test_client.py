@@ -2,8 +2,8 @@ import asyncio
 
 import httpx
 
-from client.agentsphere import stream_chat
-from protocol.agentsphere.schema import (
+from client.sphere import stream_chat
+from protocol.sphere.schema import (
     AgentChatRequest,
     AgentMessage,
     AgentRequest,

@@ -2,8 +2,8 @@ from fastapi import FastAPI
 
 from framework.base import Agent
 from framework.echo import EchoAgent
-from protocol.agentsphere.codec import AgentSphereProtocol
 from protocol.base import AgentProtocol
+from protocol.sphere.codec import SphereProtocol
 from server.api.chat import create_chat_router
 
 
@@ -12,7 +12,7 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title="Mockagent")
     app.include_router(
-        create_chat_router(agent or EchoAgent(), protocol or AgentSphereProtocol())
+        create_chat_router(agent or EchoAgent(), protocol or SphereProtocol())
     )
 
     @app.get("/health")

@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from fastapi.testclient import TestClient
 
 from agent_model import AgentEvent, AgentFailure, AgentInput
-from protocol.agentsphere.schema import parse_event
+from protocol.sphere.schema import parse_event
 from server.app import create_app
 
 

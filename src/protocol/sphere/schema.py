@@ -49,9 +49,9 @@ class EndEvent(_Event):
     suggest_question: bool = False
 
 
-AgentSphereEvent = StartEvent | StreamMessageEvent | ErrorEvent | EndEvent
-_event_adapter = TypeAdapter(Annotated[AgentSphereEvent, Field(discriminator="type")])
+SphereEvent = StartEvent | StreamMessageEvent | ErrorEvent | EndEvent
+_event_adapter = TypeAdapter(Annotated[SphereEvent, Field(discriminator="type")])
 
 
-def parse_event(data: str) -> AgentSphereEvent:
+def parse_event(data: str) -> SphereEvent:
     return _event_adapter.validate_json(data)

@@ -2,7 +2,7 @@ import logging
 from collections.abc import AsyncIterator
 
 from agent_model import AgentEvent, AgentFailure, AgentInput, TextDelta
-from protocol.agentsphere.schema import (
+from protocol.sphere.schema import (
     AgentChatRequest,
     EndEvent,
     ErrorEvent,
@@ -17,7 +17,7 @@ def _sse(event: StartEvent | StreamMessageEvent | ErrorEvent | EndEvent) -> str:
     return f"data: {event.model_dump_json(exclude_none=True)}\n\n"
 
 
-class AgentSphereProtocol:
+class SphereProtocol:
     def decode_request(self, payload: object) -> AgentInput:
         request = AgentChatRequest.model_validate(payload)
         message = "\n".join(
