@@ -21,6 +21,10 @@ uv run python examples/call_agent.py --message "hello mockagent"
 
 The client prints the streamed events, including Echo's response to the message.
 
+## Check received requests
+
+Each valid Sphere request produces a `sphere request received` log line with its bot, context, run, and task IDs. `rewritten_query_status` is `missing`, `null`, `empty`, or `present`, so you can check whether a caller sent the field without logging the user's message or rewritten text. Match the IDs with the calling application; use Echo's streamed response when you need to compare the exact rewritten query.
+
 ## LLM agent
 
 Set a model and API key before starting the server:

@@ -14,12 +14,14 @@ class AgentMessage(BaseModel):
 
 
 class AgentAugmentedContext(BaseModel):
+    contains_pii: bool = False
     rewritten_query: str | None = None
 
 
 class AgentRequest(BaseModel):
     message: AgentMessage
     run_id: str | None = None
+    context_id: str | None = None
     task_id: str | None = None
     augmented_context: AgentAugmentedContext | None = None
 

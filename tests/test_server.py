@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator
 
 import httpx
@@ -75,6 +76,54 @@ def test_rewritten_query_reaches_agent(rewritten_query: str) -> None:
         "message": "原始问题",
         "rewritten_query": rewritten_query,
     }
+
+
+@pytest.mark.parametrize(
+    ("augmented_context", "expected_status"),
+    [
+        (None, "missing"),
+        ({}, "missing"),
+        ({"rewritten_query": None}, "null"),
+        ({"rewritten_query": ""}, "empty"),
+        ({"rewritten_query": "private rewrite", "contains_pii": True}, "present"),
+    ],
+)
+def test_request_log_records_rewrite_status_without_content(
+    caplog: pytest.LogCaptureFixture,
+    augmented_context: dict[str, object] | None,
+    expected_status: str,
+) -> None:
+    payload = _request(message="private original")
+    agent_request = payload["agent_request"]
+    assert isinstance(agent_request, dict)
+    agent_request["context_id"] = "context-1"
+    if augmented_context is not None:
+        agent_request["augmented_context"] = augmented_context
+
+    with (
+        caplog.at_level(logging.INFO, logger="uvicorn.error"),
+        TestClient(create_app()) as client,
+    ):
+        response = client.post("/v1/sphere/echo/chat", json=payload)
+
+    assert response.status_code == 200
+    receipt_logs = [
+        record.getMessage()
+        for record in caplog.records
+        if "sphere request received" in record.getMessage()
+    ]
+    assert len(receipt_logs) == 1
+    assert (
+        "bot_id=echo context_id=context-1 run_id=run-1 task_id=task-1"
+        in receipt_logs[0]
+    )
+    assert f"rewritten_query_status={expected_status}" in receipt_logs[0]
+    assert (
+        f"contains_pii={bool(augmented_context and augmented_context.get('contains_pii'))}"
+        in receipt_logs[0]
+    )
+    assert "private original" not in receipt_logs[0]
+    assert "private rewrite" not in receipt_logs[0]
 
 
 @pytest.mark.parametrize(
