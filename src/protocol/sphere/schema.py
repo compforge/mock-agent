@@ -194,6 +194,7 @@ class StepToolEvent(_Event):
     type: Literal["STEP_TOOL"] = "STEP_TOOL"
     tool_name: str
     tool_status: Literal["start", "end"]
+    tool_call_id: str | None = None
     tool_description: str | None = None
     tool_type: str | None = None
     tool_tags: list[str] | None = None
