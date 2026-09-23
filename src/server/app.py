@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI
 
+from framework.cubeloop.agent import CubeLoopAgentBuilder
 from framework.default.echo import EchoAgentBuilder
 from framework.default.llm import LLMAgentBuilder
 from framework.default.sphere_demo import SphereDemoAgentBuilder
@@ -14,6 +15,7 @@ from server.registry import AgentRegistry
 
 def create_app(registry: AgentRegistry | None = None) -> FastAPI:
     llm_client = None
+    cubeloop_agent = None
     if registry is None:
         config = ServerConfig()
         llm_client = httpx.AsyncClient(
@@ -26,6 +28,8 @@ def create_app(registry: AgentRegistry | None = None) -> FastAPI:
         registry.register_agent(EchoAgentBuilder().build(agent_config))
         registry.register_agent(LLMAgentBuilder(llm_client).build(agent_config))
         registry.register_agent(SphereDemoAgentBuilder().build(agent_config))
+        cubeloop_agent = CubeLoopAgentBuilder().build(agent_config)
+        registry.register_agent(cubeloop_agent)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -34,6 +38,8 @@ def create_app(registry: AgentRegistry | None = None) -> FastAPI:
         finally:
             if llm_client is not None:
                 await llm_client.aclose()
+            if cubeloop_agent is not None:
+                await cubeloop_agent.aclose()
 
     app = FastAPI(title="Mockagent", lifespan=lifespan)
     app.include_router(create_chat_router(registry))

@@ -21,6 +21,7 @@ src/
   framework/
     base.py               # Agent 与 AgentBuilder 接口
     default/              # 不依赖外部 agent framework 的内置 agent 和 builder
+    cubeloop/             # CubeLoop 运行时接入及 Sphere 事件映射
   client/                 # HTTP 调用封装，复用协议模型
 examples/                 # 可运行的客户端示例
 tests/                    # API 与客户端行为验证

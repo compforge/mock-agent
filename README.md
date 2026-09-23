@@ -62,6 +62,14 @@ uv run python examples/call_agent.py --agent-id llm --message "hello mockagent"
 
 To use another OpenAI-compatible provider, set `OPENAI_BASE_URL` to its API base URL before starting the server. The LLM agent streams text chunks back to the caller. A missing model or API key produces an SSE `ERROR` event.
 
+## CubeLoop agent
+
+The `/v1/sphere/cubeloop/chat` route runs a new CubeLoop agent for each request, using the same `OPENAI_MODEL`, `OPENAI_API_KEY`, and optional `OPENAI_BASE_URL` settings as the LLM agent. It maps reply text to `STREAM_MESSAGE`, reasoning to `STEP_THINKING` and `STEP_STREAM_REASONING_MESSAGE`, tool execution to `STEP_TOOL`, and the final answer to `OUTPUT`. Tool events appear when tools are supplied to the CubeLoop agent; the built-in route does not register any tools. When `augmented_context.rewritten_query` is present, that value is the prompt, including an empty string; otherwise the prompt is the request message. Each request has independent conversation state.
+
+```bash
+uv run python examples/call_agent.py --agent-id cubeloop --message "hello mockagent"
+```
+
 ## Extend Mockagent
 
 Implement `Agent.ID()`, `Agent.protocol()` and `Agent.run(input: AgentInput) -> AsyncIterator[AgentEvent]` to add an agent behavior. Pair it with an `AgentBuilder` whose `build(config: AgentConfig)` creates the agent. `protocol()` returns the name of the supported protocol. Each protocol defines its own input and event subclasses. Register its adapter before building and registering its agents:
