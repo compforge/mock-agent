@@ -1,11 +1,15 @@
+import os
 from collections.abc import Mapping, Sequence
+from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 
 from framework.base import Agent
 from framework.default.echo import EchoAgent
+from framework.default.llm import LLMAgent
 from protocol.base import AgentProtocol
-from protocol.sphere.codec import SphereProtocol
+from protocol.sphere import codec as sphere_codec
 from server.api.chat import create_chat_router
 
 
@@ -13,11 +17,39 @@ def create_app(
     protocols: Mapping[str, AgentProtocol] | None = None,
     frameworks: Mapping[str, Sequence[Agent]] | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Mockagent")
+    llm_client = None
+    if frameworks is None:
+        llm_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=5, read=60, write=10, pool=5),
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+        frameworks = {
+            "default": (
+                EchoAgent(),
+                LLMAgent(
+                    llm_client,
+                    model=os.environ.get("OPENAI_MODEL"),
+                    api_key=os.environ.get("OPENAI_API_KEY"),
+                    base_url=os.environ.get(
+                        "OPENAI_BASE_URL", "https://api.openai.com/v1"
+                    ),
+                ),
+            )
+        }
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        try:
+            yield
+        finally:
+            if llm_client is not None:
+                await llm_client.aclose()
+
+    app = FastAPI(title="Mockagent", lifespan=lifespan)
     app.include_router(
         create_chat_router(
-            protocols if protocols is not None else {"sphere": SphereProtocol()},
-            frameworks if frameworks is not None else {"default": (EchoAgent(),)},
+            protocols if protocols is not None else {"sphere": sphere_codec.Protocol()},
+            frameworks,
         )
     )
 

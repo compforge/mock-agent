@@ -1,7 +1,8 @@
 import logging
 from collections.abc import AsyncIterator
 
-from agent_model import AgentEvent, AgentFailure, AgentInput, TextDelta
+from agent_model import AgentEvent, AgentInput
+from protocol.sphere.model import Failure, Input, TextDelta
 from protocol.sphere.schema import (
     AgentChatRequest,
     EndEvent,
@@ -17,8 +18,8 @@ def _sse(event: StartEvent | StreamMessageEvent | ErrorEvent | EndEvent) -> str:
     return f"data: {event.model_dump_json(exclude_none=True)}\n\n"
 
 
-class SphereProtocol:
-    def decode_request(self, payload: object) -> AgentInput:
+class Protocol:
+    def decode_request(self, payload: object) -> Input:
         request = AgentChatRequest.model_validate(payload)
         message = "\n".join(
             part.text
@@ -26,10 +27,11 @@ class SphereProtocol:
             if part.type == "text" and part.text is not None
         )
         augmented_context = request.agent_request.augmented_context
-        return AgentInput(
+        return Input(
             message=message,
             run_id=request.agent_request.run_id,
             task_id=request.agent_request.task_id,
+            bot_id=request.bot_id,
             rewritten_query=(
                 augmented_context.rewritten_query if augmented_context else None
             ),
@@ -44,7 +46,7 @@ class SphereProtocol:
             async for event in events:
                 if isinstance(event, TextDelta):
                     yield _sse(StreamMessageEvent(content=event.content, **common))
-                elif isinstance(event, AgentFailure):
+                elif isinstance(event, Failure):
                     yield _sse(
                         ErrorEvent(
                             error_code=event.code,

@@ -1,7 +1,8 @@
 import json
 from collections.abc import AsyncIterator
 
-from agent_model import AgentEvent, AgentInput, TextDelta
+from agent_model import AgentEvent, AgentInput
+from protocol.sphere import model as sphere
 
 
 class EchoAgent:
@@ -9,11 +10,13 @@ class EchoAgent:
         return "echo"
 
     async def run(self, input: AgentInput) -> AsyncIterator[AgentEvent]:
+        if not isinstance(input, sphere.Input):
+            raise TypeError("EchoAgent requires protocol.sphere.model.Input")
         if input.rewritten_query is None:
-            yield TextDelta(content=input.message)
+            yield sphere.TextDelta(content=input.message)
             return
 
-        yield TextDelta(
+        yield sphere.TextDelta(
             content=json.dumps(
                 {"message": input.message, "rewritten_query": input.rewritten_query},
                 ensure_ascii=False,
