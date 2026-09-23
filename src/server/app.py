@@ -1,18 +1,24 @@
+from collections.abc import Mapping, Sequence
+
 from fastapi import FastAPI
 
 from framework.base import Agent
-from framework.echo import EchoAgent
+from framework.default.echo import EchoAgent
 from protocol.base import AgentProtocol
 from protocol.sphere.codec import SphereProtocol
 from server.api.chat import create_chat_router
 
 
 def create_app(
-    agent: Agent | None = None, protocol: AgentProtocol | None = None
+    protocols: Mapping[str, AgentProtocol] | None = None,
+    frameworks: Mapping[str, Sequence[Agent]] | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Mockagent")
     app.include_router(
-        create_chat_router(agent or EchoAgent(), protocol or SphereProtocol())
+        create_chat_router(
+            protocols if protocols is not None else {"sphere": SphereProtocol()},
+            frameworks if frameworks is not None else {"default": (EchoAgent(),)},
+        )
     )
 
     @app.get("/health")

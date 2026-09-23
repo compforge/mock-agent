@@ -5,6 +5,9 @@ from agent_model import AgentEvent, AgentInput, TextDelta
 
 
 class EchoAgent:
+    def ID(self) -> str:
+        return "echo"
+
     async def run(self, input: AgentInput) -> AsyncIterator[AgentEvent]:
         if input.rewritten_query is None:
             yield TextDelta(content=input.message)

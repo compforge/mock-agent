@@ -34,7 +34,9 @@ async def main(url: str, message: str, rewritten_query: str | None) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", default="http://127.0.0.1:8000/api/v1/chats")
+    parser.add_argument(
+        "--url", default="http://127.0.0.1:8000/v1/sphere/default/echo/chat"
+    )
     parser.add_argument("--message", default="hello mockagent")
     parser.add_argument("--rewritten-query")
     args = parser.parse_args()

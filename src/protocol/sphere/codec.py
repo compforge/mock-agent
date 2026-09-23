@@ -28,7 +28,6 @@ class SphereProtocol:
         augmented_context = request.agent_request.augmented_context
         return AgentInput(
             message=message,
-            bot_id=request.bot_id,
             run_id=request.agent_request.run_id,
             task_id=request.agent_request.task_id,
             rewritten_query=(
