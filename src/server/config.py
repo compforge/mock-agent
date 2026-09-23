@@ -1,19 +1,11 @@
-import os
-from dataclasses import dataclass
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 
 
-@dataclass(frozen=True)
-class LLMConfig:
-    model: str | None
-    api_key: str | None
-    base_url: str
+class ServerConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_ignore_empty=True)
 
-    @classmethod
-    def from_env(cls) -> "LLMConfig":
-        return cls(
-            model=os.environ.get("OPENAI_MODEL"),
-            api_key=os.environ.get("OPENAI_API_KEY"),
-            base_url=os.environ.get("OPENAI_BASE_URL") or DEFAULT_OPENAI_BASE_URL,
-        )
+    openai_model: str | None = None
+    openai_api_key: str | None = None
+    openai_base_url: str = DEFAULT_OPENAI_BASE_URL

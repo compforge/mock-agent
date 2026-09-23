@@ -11,6 +11,7 @@ src/
   agent_model.py          # 协议无关的 AgentInput 与 AgentEvent
   server/
     app.py                # 创建应用并绑定默认协议与 agent
+    config.py             # 服务配置与环境变量入口
     api/                  # HTTP handler；只负责组合与返回响应
   protocol/
     base.py               # 协议适配接口

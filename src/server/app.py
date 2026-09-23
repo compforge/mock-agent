@@ -10,7 +10,7 @@ from framework.default.llm import LLMAgent
 from protocol.base import AgentProtocol
 from protocol.sphere import codec as sphere_codec
 from server.api.chat import create_chat_router
-from server.config import LLMConfig
+from server.config import ServerConfig
 
 
 def create_app(
@@ -19,7 +19,7 @@ def create_app(
 ) -> FastAPI:
     llm_client = None
     if frameworks is None:
-        llm_config = LLMConfig.from_env()
+        config = ServerConfig()
         llm_client = httpx.AsyncClient(
             timeout=httpx.Timeout(connect=5, read=60, write=10, pool=5),
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
@@ -29,9 +29,9 @@ def create_app(
                 EchoAgent(),
                 LLMAgent(
                     llm_client,
-                    model=llm_config.model,
-                    api_key=llm_config.api_key,
-                    base_url=llm_config.base_url,
+                    model=config.openai_model,
+                    api_key=config.openai_api_key,
+                    base_url=config.openai_base_url,
                 ),
             )
         }
