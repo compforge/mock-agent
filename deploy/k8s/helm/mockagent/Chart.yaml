@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mockagent
+description: HTTP mock agent with streaming responses
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
