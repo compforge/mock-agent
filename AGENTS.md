@@ -8,6 +8,7 @@ Mockagent 是用于模拟下游 agent HTTP/SSE 行为的开源服务。协议适
 
 ```text
 src/
+  VERSION                 # 服务代码版本
   agent_model.py          # 协议无关的 AgentInput 与 AgentEvent
   server/
     app.py                # 创建应用并注册各协议的 agent
@@ -32,6 +33,7 @@ tests/                    # API 与客户端行为验证
 - `Agent.ID()` 返回实现的公开 ID，`Agent.protocol()` 返回支持的协议名；registry 要求先注册协议适配器，再注册该协议的 agent，并拒绝重复 ID。`Agent.run(input)` 的调用结果是 `AsyncIterator[AgentEvent]`。具体实现使用带 `yield` 的 `async def`，接口声明返回异步迭代器，不声明为需要先 `await` 的协程。
 - 每个 agent 实现提供相应的 `AgentBuilder`，统一接收 `AgentConfig`。`ServerConfig.to_agent_config()` 转换服务配置；server 持有并回收外部客户端。
 - `/v1/{protocol}/{agentid}/chat` 从 registry 查找协议适配器与 agent。`server/api` 只做查找和 HTTP 边界处理；`framework/default/` 是源码组织，不参与 URL 路由。客户端通过 `protocol` 中的模型和事件解析函数复用协议契约。
+- 修改 `src/` 下的运行时代码时同步递增 `src/VERSION`，便于定位镜像对应的代码版本。
 
 ## 验证与参考
 
