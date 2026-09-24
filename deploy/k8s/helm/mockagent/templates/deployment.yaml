@@ -25,10 +25,16 @@ spec:
             - name: http
               containerPort: 8000
               protocol: TCP
-          {{- with .Values.openai.baseUrl }}
+          {{- if or .Values.openai.baseUrl .Values.openai.model }}
           env:
+            {{- with .Values.openai.baseUrl }}
             - name: OPENAI_BASE_URL
               value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.openai.model }}
+            - name: OPENAI_MODEL
+              value: {{ . | quote }}
+            {{- end }}
           {{- end }}
           readinessProbe:
             httpGet:
