@@ -109,4 +109,13 @@ Replace the example registry and tag with your own. The chart creates a Deployme
 
 Set `openai.baseUrl` and `openai.model` in chart values to inject `OPENAI_BASE_URL` and `OPENAI_MODEL` into the Pod. Keep personal overrides in an ignored `.local/values.yaml` and pass it with `-f .local/values.yaml` when running Helm.
 
-Supply `OPENAI_API_KEY` separately through your deployment's secret configuration; the chart does not store a key in values.
+Create a Kubernetes Secret containing the API key, then reference it in your values file:
+
+```yaml
+openai:
+  apiKeySecret:
+    name: mockagent-openai
+    key: api-key
+```
+
+The chart injects `OPENAI_API_KEY` from that Secret. Keep the key value out of Helm values and the repository.
