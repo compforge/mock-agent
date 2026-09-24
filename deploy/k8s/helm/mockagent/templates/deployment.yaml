@@ -25,7 +25,7 @@ spec:
             - name: http
               containerPort: 8000
               protocol: TCP
-          {{- if or .Values.openai.baseUrl .Values.openai.model }}
+          {{- if or .Values.openai.baseUrl .Values.openai.model .Values.openai.apiKeySecret.name }}
           env:
             {{- with .Values.openai.baseUrl }}
             - name: OPENAI_BASE_URL
@@ -34,6 +34,13 @@ spec:
             {{- with .Values.openai.model }}
             - name: OPENAI_MODEL
               value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.openai.apiKeySecret.name }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . | quote }}
+                  key: {{ $.Values.openai.apiKeySecret.key | quote }}
             {{- end }}
           {{- end }}
           readinessProbe:
